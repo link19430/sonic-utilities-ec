@@ -1784,6 +1784,7 @@ def load_minigraph(db, no_service_restart, traffic_shift_away, override_config, 
     if not no_service_restart:
         log.log_notice("'load_minigraph' stopping services...")
         _stop_services()
+        delete_kernel_vrf()
 
     # For Single Asic platform the namespace list has the empty string
     # for mulit Asic platform the empty string to generate the config
@@ -1878,6 +1879,20 @@ def load_minigraph(db, no_service_restart, traffic_shift_away, override_config, 
         log.log_notice("'load_minigraph' restarting services...")
         _restart_services()
     click.echo("Please note setting loaded from minigraph will be lost after system reboot. To preserve setting, run `config save`.")
+
+def delete_kernel_vrf():
+    """Delete VRF interfaces from kernel before reloading the config."""
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    vrf_keys = config_db.get_keys("VRF")
+    for vrf in vrf_keys:
+        try:
+            subprocess.run(["sudo", "ip", "link", "del", vrf], check=False)
+            click.echo(f"Delete VRF {vrf} from kernel")
+            log.log_notice(f"Delete VRF {vrf} from kernel")
+        except Exception as e:
+            click.echo(f"Failed to delete VRF {vrf}: {e}")
+            log.log_notice(f"Failed to delete VRF {vrf}: {e}")
 
 def load_port_config(config_db, port_config_path):
     if not os.path.isfile(port_config_path):
